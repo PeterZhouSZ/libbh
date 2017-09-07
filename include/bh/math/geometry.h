@@ -12,7 +12,7 @@
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/split_member.hpp>
 #include "../common.h"
-#include "../../ait/eigen.h"
+#include "../eigen.h"
 #include "contrib_tribox3.h"
 
 namespace bh {
