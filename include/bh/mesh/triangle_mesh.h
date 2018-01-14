@@ -187,7 +187,6 @@ private:
 
 //  static CacheStorage<std::pair<FloatT, size_t>, TriangleMeshType, bh::pair_hash<FloatT, size_t>>
 //    unit_radius_cylinder_storage_;
-    ;
 };
 
 } /* namespace bh */

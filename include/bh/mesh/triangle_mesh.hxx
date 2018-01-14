@@ -591,22 +591,20 @@ template <typename TriIterator>
 auto TriangleMeshFactory<FloatT, IndexT>::createFromTriangles(
     const TriIterator first, const TriIterator last) -> TriangleMeshType {
   TriangleMeshType mesh;
-  mesh.triangleVertexIndices().resize(last - first);
   std::unordered_map<Vector3, size_t> vertex_index_map;
   const auto get_vertex_index_lambda = [&] (const Vector3& v) {
     const auto it = vertex_index_map.find(v);
-    size_t idx;
     if (it == vertex_index_map.end()) {
-      idx = mesh.m_Vertices.size();
+      const size_t idx = mesh.vertices().size();
       mesh.vertices().push_back(v);
       vertex_index_map.emplace(v, idx);
+      return idx;
     }
     else {
-      idx = vertex_index_map.at(v);
+      return vertex_index_map.at(v);
     }
-    return idx;
   };
-  mesh.triangle_vertex_indices_.reserve(last - first);
+  mesh.triangleVertexIndices().reserve(last - first);
   for (TriIterator it = first; it != last; ++it) {
     const TriangleType& triangle = *it;
     const IndexT idx1 = get_vertex_index_lambda(triangle.v1());
@@ -615,6 +613,8 @@ auto TriangleMeshFactory<FloatT, IndexT>::createFromTriangles(
     Vector3i tri_indices(idx1, idx2, idx3);
     mesh.triangle_vertex_indices_.push_back(std::move(tri_indices));
   }
+  mesh.vertices().shrink_to_fit();
+  mesh.triangleVertexIndices().shrink_to_fit();
   return mesh;
 }
 

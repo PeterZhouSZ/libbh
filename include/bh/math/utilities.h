@@ -69,25 +69,25 @@ namespace bh {
   template <typename FloatT1, typename FloatT2>
   bool isApproxGreater(const FloatT1 a, const FloatT2 b,
                        const FloatT1 tolerance = std::numeric_limits<FloatT1>::epsilon()) {
-    return a > b + tolerance;
+    return a > b - tolerance;
   }
 
   template <typename FloatT1, typename FloatT2>
   bool isApproxGreaterEqual(const FloatT1 a, const FloatT2 b,
                             const FloatT1 tolerance = std::numeric_limits<FloatT1>::epsilon()) {
-    return a >= b + tolerance;
+    return a >= b - tolerance;
   }
 
   template <typename FloatT1, typename FloatT2>
   bool isApproxSmaller(const FloatT1 a, const FloatT2 b,
                        const FloatT1 tolerance = std::numeric_limits<FloatT1>::epsilon()) {
-    return a < b - tolerance;
+    return a < b + tolerance;
   }
 
   template <typename FloatT1, typename FloatT2>
   bool isApproxSmallerEqual(const FloatT1 a, const FloatT2 b,
                             const FloatT1 tolerance = std::numeric_limits<FloatT1>::epsilon()) {
-    return a <= b - tolerance;
+    return a <= b + tolerance;
   }
 
 }

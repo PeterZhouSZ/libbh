@@ -61,23 +61,31 @@ struct Ray {
   USE_FIXED_EIGEN_TYPES(FloatType)
 
   Ray()
-      : origin(Vector3::Zero()), direction(Vector3::UnitX()) {}
+      : origin_(Vector3::Zero()), direction_(Vector3::UnitX()) {}
 
   Ray(const Vector3& origin, const Vector3& direction)
-      : origin(origin), direction(direction.normalized()) {}
+      : origin_(origin), direction_(direction.normalized()) {}
+
+  const Vector3& origin() const {
+    return origin_;
+  }
+
+  const Vector3& direction() const {
+    return direction_;
+  }
 
   void setOrigin(const Vector3& origin) {
-    this->origin = origin;
+    origin_ = origin;
   }
 
   void setDirection(const Vector3& direction) {
-    this->direction = direction.normalized();
+    direction_ = direction.normalized();
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  Vector3 origin;
-  Vector3 direction;
+  Vector3 origin_;
+  Vector3 direction_;
 };
 
 template <typename FloatT>
@@ -88,26 +96,28 @@ struct RayData : public Ray<FloatT> {
 
   RayData()
       : RayType(Vector3::Zero(), Vector3::UnitX()),
-        inv_direction(RayType::direction.cwiseInverse()) {}
+        inv_direction_(RayType::direction().cwiseInverse()) {}
 
   RayData(const Vector3& origin, const Vector3& direction)
       : RayType(origin, direction),
-        inv_direction(RayType::direction.cwiseInverse()) {}
+        inv_direction_(RayType::direction().cwiseInverse()) {}
 
   RayData(const RayType& ray)
       : RayType(ray),
-        inv_direction(RayType::direction.cwiseInverse()) {}
+        inv_direction_(RayType::direction().cwiseInverse()) {}
 
   void setDirection(const Vector3& direction) {
     RayType::setDirection(direction);
-    this->inv_direction = this->direction.cwiseInverse();
+    this->inv_direction_ = this->direction().cwiseInverse();
+  }
+
+  const Vector3& invDirection() const {
+    return inv_direction_;
   }
 
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
-  Vector3 inv_direction;
-  FloatType min_range_sq;
-  FloatType max_range_sq;
+  Vector3 inv_direction_;
 };
 
 template <typename FloatT>
@@ -136,6 +146,25 @@ public:
   using RayType = Ray<FloatT>;
   using RayDataType = RayData<FloatT>;
   using RayIntersectionType = RayIntersection<FloatT>;
+
+  static BoundingBox3D Invalid() {
+    const FloatType min_value = std::numeric_limits<FloatType>::lowest();
+    const FloatType max_value = std::numeric_limits<FloatType>::max();
+    const BoundingBox3D bbox(Vector3(max_value, max_value, max_value), Vector3(min_value, min_value, min_value));
+    return bbox;
+  }
+
+  static BoundingBox3D Empty() {
+    const BoundingBox3D bbox(Vector3::Zero(), Vector3::Zero());
+    return bbox;
+  }
+
+  static BoundingBox3D Infinite() {
+    const FloatType min_value = std::numeric_limits<FloatType>::lowest();
+    const FloatType max_value = std::numeric_limits<FloatType>::max();
+    const BoundingBox3D bbox(Vector3(min_value, min_value, min_value), Vector3(max_value, max_value, max_value));
+    return bbox;
+  }
 
   static BoundingBox3D createFromCenterAndExtent(const Vector3& center, const Vector3& extent) {
     const Vector3 min = center - extent / 2;
@@ -306,8 +335,8 @@ public:
     FloatT t_upper = t_max;
     const size_t kDimensions = 3;
     for (size_t i = 0; i < kDimensions; ++i) {
-      const FloatT t0 = (min_(i) - ray.origin(i)) * ray.inv_direction(i);
-      const FloatT t1 = (max_(i) - ray.origin(i)) * ray.inv_direction(i);
+      const FloatT t0 = (min_(i) - ray.origin()(i)) * ray.invDirection()(i);
+      const FloatT t1 = (max_(i) - ray.origin()(i)) * ray.invDirection()(i);
       t_lower = std::max(t_lower, std::min(t0, t1));
       t_upper = std::min(t_upper, std::max(t0, t1));
     }
@@ -321,7 +350,6 @@ public:
 
   bool intersects(const RayType& ray, Vector3* intersection = nullptr) const {
     RayDataType ray_data(ray);
-    ray_data.inv_direction = ray.direction.cwiseInverse();
     return intersects(ray_data, intersection);
   }
 
@@ -345,8 +373,8 @@ public:
 
     // Faster version without explicit check for directions parallel to an axis
     for (std::size_t i = 0; i < 3; ++i) {
-      float t0 = (min_(i) - ray_data.origin(i)) * ray_data.inv_direction(i);
-      float t1 = (max_(i) - ray_data.origin(i)) * ray_data.inv_direction(i);
+      float t0 = (min_(i) - ray_data.origin()(i)) * ray_data.invDirection()(i);
+      float t1 = (max_(i) - ray_data.origin()(i)) * ray_data.invDirection()(i);
       t_min = std::max(t_min, std::min(t0, t1));
       t_max = std::min(t_max, std::max(t0, t1));
     }
@@ -354,7 +382,7 @@ public:
     bool intersect = t_max > std::max(t_min, FloatType(0));
     if (intersect && intersection != nullptr) {
       t_min = std::max(t_min, FloatType(0));
-      *intersection = ray_data.origin + ray_data.direction * t_min;
+      *intersection = ray_data.origin() + ray_data.direction() * t_min;
     }
     return intersect;
   }
@@ -588,6 +616,10 @@ public:
     return area_square;
   }
 
+  FloatType computeTriangleArea() const {
+    return std::sqrt(computeTriangleAreaSquare());
+  }
+
   std::array<Triangle, 2> splitTriangle() const {
     return splitTriangleInto2();
   }
@@ -683,7 +715,7 @@ public:
     //  http://www.cs.virginia.edu/~gfx/Courses/2003/ImageSynthesis/papers/Acceleration/Fast%20MinimumStorage%20RayTriangle%20Intersection.pdf)
     const Vector3 e1 = v2_ - v1_;
     const Vector3 e2 = v3_ - v1_;
-    const Vector3 p = ray.direction.cross(e2);
+    const Vector3 p = ray.direction().cross(e2);
     const FloatT det = e1.dot(p);
     if (only_front_faces) {
       if (det < tolerance) {
@@ -696,13 +728,13 @@ public:
       }
     }
     const FloatT inv_det = 1 / det;
-    const Vector3 vt = ray.origin - v1_;
+    const Vector3 vt = ray.origin() - v1_;
     const FloatT u = vt.dot(p) * inv_det;
     if (u < 0 || u > 1) {
       return RayIntersectionType(false, 0);
     }
     const Vector3 q = vt.cross(e1);
-    const FloatT v = ray.direction.dot(q) * inv_det;
+    const FloatT v = ray.direction().dot(q) * inv_det;
     if (v < 0 || u + v > 1) {
       return RayIntersectionType(false, 0);
     }
@@ -743,6 +775,26 @@ class Polygon2D {
 public:
   using FloatType = FloatT;
   USE_FIXED_EIGEN_TYPES(FloatType);
+
+  static Polygon2D Empty() {
+    std::vector<Vector2> vertices;
+    vertices.push_back(Vector2(0, 0));
+    vertices.push_back(Vector2(0, 0));
+    vertices.push_back(Vector2(0, 0));
+    const Polygon2D polygon2d(vertices);
+    return polygon2d;
+  }
+
+  static Polygon2D Infinite() {
+    const Polygon2D polygon2d(
+            {
+                    Vector2(std::numeric_limits<FloatType>::lowest(), std::numeric_limits<FloatType>::lowest()),
+                    Vector2(std::numeric_limits<FloatType>::lowest(), std::numeric_limits<FloatType>::max()),
+                    Vector2(std::numeric_limits<FloatType>::max(), std::numeric_limits<FloatType>::max()),
+                    Vector2(std::numeric_limits<FloatType>::max(), std::numeric_limits<FloatType>::lowest())
+            });
+    return polygon2d;
+  }
 
   Polygon2D() {}
 
@@ -883,6 +935,20 @@ public:
   using Polygon2DType = Polygon2D<FloatType>;
   using BoundingBoxType = BoundingBox3D<FloatType>;
 
+  static PolygonWithLowerAndUpperPlane Empty() {
+    const Polygon2DType polygon2d = Polygon2DType::Empty();
+    const PolygonWithLowerAndUpperPlane polygon(
+            polygon2d, 1, -1);
+    return polygon;
+  }
+
+  static PolygonWithLowerAndUpperPlane Infinite() {
+    const Polygon2DType polygon2d = Polygon2DType::Infinite();
+    const PolygonWithLowerAndUpperPlane polygon(
+            polygon2d, std::numeric_limits<FloatType>::lowest(), std::numeric_limits<FloatType>::max());
+    return polygon;
+  }
+
   PolygonWithLowerAndUpperPlane()
   : lower_plane_z_(1), upper_plane_z_(-1) {}
 
@@ -988,5 +1054,45 @@ using PolygonWithLowerAndUpperPlaned = PolygonWithLowerAndUpperPlane<double>;
 #if __GNUC__ && !__CUDACC__
   #pragma GCC pop_options
 #endif
+
+}
+
+namespace boost {
+
+template <typename FloatT>
+void validate(boost::any& v,
+              const std::vector<std::string>& values,
+              bh::BoundingBox3D<FloatT>* target_type, int) {
+  using namespace boost::program_options;
+
+  BH_USE_FIXED_EIGEN_TYPES(FloatT);
+
+  // Make sure no previous assignment to 'v' was made.
+  validators::check_first_occurrence(v);
+
+  std::string s = validators::get_single_string(values);
+  bh::trimLeft(s, boost::is_any_of("[("));
+  bh::trimRight(s, boost::is_any_of("])"));
+
+  std::vector<std::string> split_vec;
+  boost::split(split_vec, s, boost::is_any_of(" ,"), boost::token_compress_on);
+
+  if (split_vec.size() != 6) {
+    boost::throw_exception(validation_error(validation_error::invalid_option_value));
+  }
+
+  std::array<FloatT, 6> float_values;
+  for (size_t i = 0; i < float_values.size(); ++i) {
+    std::string s = split_vec[i];
+    bh::trimLeft(s, boost::is_any_of("[("));
+    bh::trimRight(s, boost::is_any_of("])"));
+    float_values[i] = boost::lexical_cast<FloatT>(s);
+  }
+
+  bh::BoundingBox3D<FloatT> bbox(
+          Vector3(float_values[0], float_values[1], float_values[2]),
+          Vector3(float_values[3], float_values[4], float_values[5]));
+  v = boost::any(bbox);
+}
 
 }
