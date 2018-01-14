@@ -12,6 +12,9 @@
 #include <condition_variable>
 #include <atomic>
 #include <bh/common.h>
+#if __GNUC__
+#include <pthread.h>
+#endif
 
 namespace bh {
 
@@ -19,6 +22,17 @@ class Thread {
 public:
   static std::size_t getHardwareConcurrency() {
     return std::thread::hardware_concurrency();
+  }
+
+  Thread(const std::string& name, bool start_now = false)
+  : keep_running_(true), finished_(false) {
+#if __GNUC__
+    // Set pthread name for easier debugging
+    pthread_setname_np(thread_.native_handle(), name.c_str());
+#endif
+    if (start_now) {
+      start();
+    }
   }
 
   Thread(bool start_now = false)
@@ -40,6 +54,10 @@ public:
 //    template <class Function, class... Args>
 //    explicit Thread(Function&& f, Args&& args)
 //    : thread_(std::forward(f), std::forward(args)), keep_running_(true), finished_(false) {}
+
+  const std::string& getName() const {
+    return name_;
+  }
 
   void setFinishedCallback(std::function<void()> finished_callback) {
     finished_callback_ = finished_callback;
@@ -116,6 +134,7 @@ private:
   std::atomic<bool> keep_running_;
   std::atomic<bool> finished_;
   std::function<void()> finished_callback_;
+  std::string name_;
 };
 
 class WorkerThread : public Thread {
@@ -126,6 +145,9 @@ public:
   };
 
   WorkerThread() {}
+
+  WorkerThread(const std::string& name)
+  : Thread(name) {}
 
   ~WorkerThread() override {}
 
@@ -150,6 +172,9 @@ public:
 
   PausableThread(bool start_paused = false)
   : paused_(start_paused), verbose_(false) {}
+
+  PausableThread(const std::string& name, bool start_paused = false)
+          : Thread(name), paused_(start_paused), verbose_(false) {}
 
   ~PausableThread() override {}
 
