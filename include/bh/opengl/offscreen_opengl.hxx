@@ -6,11 +6,14 @@
 //  Created on: 19.04.17
 //==================================================
 
+#pragma GCC push_options
+#pragma GCC optimize("O0")
+
 namespace bh {
 namespace opengl {
 
-template <typename FloatT>
-OffscreenOpenGL<FloatT>::DrawingHandle::DrawingHandle(OffscreenOpenGL& opengl, const bool clear_viewport)
+template <typename FloatT, typename QOpenGLFunctionsType>
+OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::DrawingHandle(OffscreenOpenGL& opengl, const bool clear_viewport)
     : finished_(false),
       opengl_(opengl) {
         lock_ = opengl_.acquireOpenGLLock();
@@ -22,21 +25,22 @@ OffscreenOpenGL<FloatT>::DrawingHandle::DrawingHandle(OffscreenOpenGL& opengl, c
         }
 }
 
-template <typename FloatT>
-OffscreenOpenGL<FloatT>::DrawingHandle::~DrawingHandle() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::~DrawingHandle() {
   if (!finished_) {
     finish();
   }
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::DrawingHandle::finish() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::finish() {
   opengl_.finishOpenGLDrawing();
   opengl_.releaseOpenGLFbo();
   finished_ = true;
 }
-template <typename FloatT>
-QImage OffscreenOpenGL<FloatT>::DrawingHandle::getImageQt() {
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+QImage OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::getImageQt() {
   opengl_.opengl_context_->functions()->glFlush();
 
   QImage fbo_image_raw = opengl_.opengl_fbo_->toImage();
@@ -52,18 +56,38 @@ QImage OffscreenOpenGL<FloatT>::DrawingHandle::getImageQt() {
   return image;
 }
 
-template <typename FloatT>
-const OffscreenOpenGL<FloatT>* OffscreenOpenGL<FloatT>::DrawingHandle::operator->() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOpenGLContext* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::getGLContext() const {
+  return opengl_.opengl_context_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOpenGLContext* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::getGLContext() {
+  return opengl_.opengl_context_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOpenGLFunctionsType* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::getGLFunctions() const {
+  return opengl_.opengl_functions_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOpenGLFunctionsType* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::getGLFunctions() {
+  return opengl_.opengl_functions_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+const OffscreenOpenGL<FloatT, QOpenGLFunctionsType>* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::operator->() const {
   return &opengl_;
 }
 
-template <typename FloatT>
-OffscreenOpenGL<FloatT>* OffscreenOpenGL<FloatT>::DrawingHandle::operator->() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+OffscreenOpenGL<FloatT, QOpenGLFunctionsType>* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::DrawingHandle::operator->() {
   return &opengl_;
 }
 
-template <typename FloatT>
-OffscreenOpenGL<FloatT>::OffscreenOpenGL(const Camera& camera)
+template <typename FloatT, typename QOpenGLFunctionsType>
+OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::OffscreenOpenGL(const Camera& camera)
         : opengl_context_(nullptr),
           opengl_surface_(nullptr),
           opengl_fbo_(nullptr),
@@ -73,18 +97,18 @@ OffscreenOpenGL<FloatT>::OffscreenOpenGL(const Camera& camera)
           near_plane_(0.5),
           far_plane_(1e5) {}
 
-template <typename FloatT>
-OffscreenOpenGL<FloatT>::~OffscreenOpenGL() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::~OffscreenOpenGL() {
   clearOpenGL();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::setClearColor(const Color4& color) {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::setClearColor(const Color4& color) {
   clear_color_ = color;
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::setAntialiasing(const bool antialiasing) {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::setAntialiasing(const bool antialiasing) {
   if (isInitialized()) {
     const bool framebuffer_update_required = antialiasing != antialiasing_;
     if (framebuffer_update_required) {
@@ -94,8 +118,8 @@ void OffscreenOpenGL<FloatT>::setAntialiasing(const bool antialiasing) {
   antialiasing_ = antialiasing;
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::setCamera(const Camera& camera) {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::setCamera(const Camera& camera) {
   camera_ = camera;
   if (isInitialized()) {
     const bool framebuffer_update_required = camera_.width() != (size_t)opengl_fbo_->width()
@@ -106,72 +130,82 @@ void OffscreenOpenGL<FloatT>::setCamera(const Camera& camera) {
   }
 }
 
-template <typename FloatT>
-FloatT OffscreenOpenGL<FloatT>::getNearPlane() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+FloatT OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getNearPlane() const {
   return near_plane_;
 }
 
-template <typename FloatT>
-FloatT OffscreenOpenGL<FloatT>::getFarPlane() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+FloatT OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getFarPlane() const {
   return far_plane_;
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::setNearFarPlane(const FloatT near_plane, const FloatT far_plane) {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::setNearFarPlane(const FloatT near_plane, const FloatT far_plane) {
   near_plane_ = near_plane;
   far_plane_ = far_plane;
 }
 
-template <typename FloatT>
-std::unique_lock<std::mutex> OffscreenOpenGL<FloatT>::acquireOpenGLLock() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+std::unique_lock<std::mutex> OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::acquireOpenGLLock() const {
   return std::unique_lock<std::mutex>(opengl_mutex_);
 }
 
-template <typename FloatT>
-bool OffscreenOpenGL<FloatT>::isInitialized() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+bool OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::isInitialized() const {
   return opengl_context_ != nullptr;
 }
 
-template <typename FloatT>
-const QOpenGLContext* OffscreenOpenGL<FloatT>::getContext() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOpenGLContext* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getContext() const {
   return opengl_context_;
 }
 
-template <typename FloatT>
-QOpenGLContext* OffscreenOpenGL<FloatT>::getContext() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOpenGLContext* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getContext() {
   return opengl_context_;
 }
 
-template <typename FloatT>
-const QOffscreenSurface* OffscreenOpenGL<FloatT>::getSurface() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOpenGLFunctionsType* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getGLFunctions() const {
+  return opengl_functions_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOpenGLFunctionsType* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getGLFunctions() {
+  return opengl_functions_;
+}
+
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOffscreenSurface* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getSurface() const {
   return opengl_surface_;
 }
 
-template <typename FloatT>
-QOffscreenSurface* OffscreenOpenGL<FloatT>::getSurface() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOffscreenSurface* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getSurface() {
   return opengl_surface_;
 }
 
-template <typename FloatT>
-const QOpenGLFramebufferObject* OffscreenOpenGL<FloatT>::getFramebuffer() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QOpenGLFramebufferObject* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getFramebuffer() const {
   return opengl_fbo_;
 }
 
-template <typename FloatT>
-QOpenGLFramebufferObject* OffscreenOpenGL<FloatT>::getFramebuffer() {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QOpenGLFramebufferObject* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getFramebuffer() {
   return opengl_fbo_;
 }
 
-template <typename FloatT>
-const QThread* OffscreenOpenGL<FloatT>::getContextThread() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+const QThread* OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getContextThread() const {
   return opengl_context_->thread();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::initializeOpenGL() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::initializeOpenGL() const {
   opengl_context_ = new QOpenGLContext();
   QSurfaceFormat format;
-  format.setVersion(3, 3);
+  format.setVersion(4, 5);
   format.setProfile(QSurfaceFormat::CoreProfile);
   if (antialiasing_) {
     format.setSamples(4);
@@ -200,22 +234,25 @@ void OffscreenOpenGL<FloatT>::initializeOpenGL() const {
   opengl_fbo_->bind();
   opengl_context_->functions()->glViewport(0, 0, camera_.width(), camera_.height());
   opengl_fbo_->bindDefault();
+  opengl_functions_ = new QOpenGLFunctionsType();
+  opengl_functions_->initializeOpenGLFunctions();
   opengl_context_->doneCurrent();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::clearOpenGL() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::clearOpenGL() const {
   if (opengl_context_ != nullptr) {
     opengl_fbo_->release();
     opengl_context_->doneCurrent();
+    SAFE_DELETE(opengl_functions_);
     SAFE_DELETE(opengl_fbo_);
     SAFE_DELETE(opengl_surface_);
     SAFE_DELETE(opengl_context_);
   }
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::bindOpenGLFbo() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::bindOpenGLFbo() const {
   QThread* current_thread = QThread::currentThread();
   if (opengl_context_ != nullptr && current_thread != opengl_context_->thread()) {
     std::cout << "Warning: Clearing offscreen OpenGL objects" << std::endl;
@@ -229,14 +266,14 @@ void OffscreenOpenGL<FloatT>::bindOpenGLFbo() const {
   opengl_fbo_->bind();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::releaseOpenGLFbo() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::releaseOpenGLFbo() const {
   opengl_fbo_->bindDefault();
   opengl_context_->doneCurrent();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::beginOpenGLDrawing() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::beginOpenGLDrawing() const {
   if (antialiasing_) {
     opengl_context_->functions()->glEnable(GL_MULTISAMPLE);
   }
@@ -258,23 +295,23 @@ void OffscreenOpenGL<FloatT>::beginOpenGLDrawing() const {
   opengl_context_->functions()->glClear(GL_COLOR_BUFFER_BIT);
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::finishOpenGLDrawing() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::finishOpenGLDrawing() const {
 }
 
 
-template <typename FloatT>
-auto OffscreenOpenGL<FloatT>::beginDrawing(const bool clear_viewport) -> DrawingHandle {
+template <typename FloatT, typename QOpenGLFunctionsType>
+auto OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::beginDrawing(const bool clear_viewport) -> DrawingHandle {
   return DrawingHandle(*this, clear_viewport);
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::clear() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::clear() const {
   clear(clear_color_);
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::clear(const Color4& color) const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::clear(const Color4& color) const {
   std::unique_lock<std::mutex> lock = acquireOpenGLLock();
   bindOpenGLFbo();
   beginOpenGLDrawing();
@@ -285,19 +322,19 @@ void OffscreenOpenGL<FloatT>::clear(const Color4& color) const {
   releaseOpenGLFbo();
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::clearWithoutLock() const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::clearWithoutLock() const {
   clearWithoutLock(clear_color_);
 }
 
-template <typename FloatT>
-void OffscreenOpenGL<FloatT>::clearWithoutLock(const Color4& color) const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+void OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::clearWithoutLock(const Color4& color) const {
   opengl_context_->functions()->glClearColor(color.r(), color.g(), color.b(), color.a());
   opengl_context_->functions()->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 }
 
-template <typename FloatT>
-QMatrix4x4 OffscreenOpenGL<FloatT>::getPvmMatrixFromViewpoint(const Camera& camera, const Pose& pose) const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QMatrix4x4 OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getPvmMatrixFromViewpoint(const Camera& camera, const Pose& pose) const {
 //  const double fy = camera.focalLengthY();
 //  const double v_fov = 2 * std::atan(camera.height() / (2 * fy));
 //  const qreal v_fov_degree = v_fov * 180 / (qreal)M_PI;
@@ -318,13 +355,13 @@ QMatrix4x4 OffscreenOpenGL<FloatT>::getPvmMatrixFromViewpoint(const Camera& came
   return pvm_matrix;
 }
 
-template <typename FloatT>
-QMatrix4x4 OffscreenOpenGL<FloatT>::getPvmMatrixFromPose(const Pose& pose) const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QMatrix4x4 OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getPvmMatrixFromPose(const Pose& pose) const {
   return getPvmMatrixFromViewpoint(camera_, pose);
 }
 
-template <typename FloatT>
-QMatrix4x4 OffscreenOpenGL<FloatT>::getVmMatrixFromPose(const Pose& pose) const {
+template <typename FloatT, typename QOpenGLFunctionsType>
+QMatrix4x4 OffscreenOpenGL<FloatT, QOpenGLFunctionsType>::getVmMatrixFromPose(const Pose& pose) const {
   QMatrix4x4 model;
 
 //  const Pose view_pose = pose.inverse();
@@ -346,3 +383,5 @@ QMatrix4x4 OffscreenOpenGL<FloatT>::getVmMatrixFromPose(const Pose& pose) const 
 
 }
 }
+
+#pragma GCC pop_options

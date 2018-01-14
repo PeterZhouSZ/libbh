@@ -20,12 +20,13 @@
 #include <QOpenGLFramebufferObject>
 #include <QOffscreenSurface>
 #include <QOpenGLFunctions>
+#include <QOpenGLFunctions_4_5_Core>
 #include <QSurfaceFormat>
 
 namespace bh {
 namespace opengl {
 
-template<typename FloatT>
+template<typename FloatT, typename QOpenGLFunctionsType = QOpenGLFunctions_4_5_Core>
 class OffscreenOpenGL{
 public:
   using FloatType = FloatT;
@@ -46,6 +47,14 @@ public:
     void finish();
 
     QImage getImageQt();
+
+    const QOpenGLContext* getGLContext() const;
+
+    QOpenGLContext* getGLContext();
+
+    const QOpenGLFunctionsType* getGLFunctions() const;
+
+    QOpenGLFunctionsType* getGLFunctions();
 
     const OffscreenOpenGL* operator->() const;
 
@@ -84,6 +93,10 @@ public:
   const QOpenGLContext* getContext() const;
 
   QOpenGLContext* getContext();
+
+  const QOpenGLFunctionsType* getGLFunctions() const;
+
+  QOpenGLFunctionsType* getGLFunctions();
 
   const QOffscreenSurface* getSurface() const;
 
@@ -133,6 +146,7 @@ private:
   mutable QOpenGLContext *opengl_context_;
   mutable QOffscreenSurface *opengl_surface_;
   mutable QOpenGLFramebufferObject *opengl_fbo_;
+  mutable QOpenGLFunctionsType *opengl_functions_;
 
   bool antialiasing_;
   Color4 clear_color_;
