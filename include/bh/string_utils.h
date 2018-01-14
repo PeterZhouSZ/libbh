@@ -70,13 +70,42 @@ inline void trimLeft(std::string& str) {
   str.erase(str.begin(), std::find_if(str.begin(), str.end(), [](int ch) { return !isspace(ch); }));
 }
 
+template <typename Predicate>
+void trimLeft(std::string& str, Predicate&& pred) {
+  str.erase(str.begin(), std::find_if(str.begin(), str.end(), [&](int ch) { return !pred(ch); }));
+}
+
+inline void trimLeft(std::string& str, const char c) {
+  trimLeft(str, [c](const char o) { return c == o; });
+}
+
 inline void trimRight(std::string& str) {
   str.erase(std::find_if(str.rbegin(), str.rend(), [](int ch) { return !isspace(ch); }).base(), str.end());
+}
+
+template <typename Predicate>
+void trimRight(std::string& str, Predicate&& pred) {
+  str.erase(std::find_if(str.rbegin(), str.rend(), [&](int ch) { return !pred(ch); }).base(), str.end());
+}
+
+inline void trimRight(std::string& str, const char c) {
+  trimRight(str, [c](const char o) { return c == o; });
 }
 
 inline void trim(std::string& str) {
   trimLeft(str);
   trimRight(str);
+}
+
+template <typename Predicate>
+void trim(std::string& str, Predicate&& pred) {
+  trimLeft(str, pred);
+  trimRight(str, pred);
+}
+
+inline void trim(std::string& str, const char c) {
+  trimLeft(str, c);
+  trimRight(str, c);
 }
 
 /// Remove substring from start of string
