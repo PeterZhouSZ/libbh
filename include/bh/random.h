@@ -10,7 +10,7 @@
 
 namespace bh {
 
-template <typename FloatT, typename IntT, typename RandomNumberGeneratorT = std::mt19937_64>
+template <typename FloatT = double, typename IntT = int, typename RandomNumberGeneratorT = std::mt19937_64>
 class Random {
 public:
   using FloatType = FloatT;
