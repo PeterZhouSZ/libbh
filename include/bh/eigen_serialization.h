@@ -10,7 +10,7 @@
 #include "eigen.h"
 
 namespace boost {
-//namespace serialization {
+namespace serialization {
 
 // TODO: These don't work
 //  template<typename Archive, typename Derived>
@@ -49,19 +49,19 @@ namespace boost {
 //    ar & boost::serialization::make_array(quat.coeffs().data(), quat.coeffs().size());
 //  }
 
-  template<typename Archive>
+  template<typename Archive, typename _Scalar>
   inline void serialize(
       Archive& ar,
-      Eigen::Quaternion<float>& quat,
+      Eigen::Quaternion<_Scalar>& quat,
       const unsigned int version
   ) {
     ar & boost::serialization::make_array(quat.coeffs().data(), quat.coeffs().size());
   }
 
-  template<typename Archive>
+  template<typename Archive, typename _Scalar>
   inline void serialize(
       Archive& ar,
-      const Eigen::Quaternion<float>& quat,
+      const Eigen::Quaternion<_Scalar>& quat,
       const unsigned int version
   ) {
     ar & boost::serialization::make_array(quat.coeffs().data(), quat.coeffs().size());
@@ -83,5 +83,5 @@ namespace boost {
     ar & boost::serialization::make_array(matrix.data(), matrix.size());
   }
 
-//}
+}
 }

@@ -15,6 +15,7 @@
 #include <Eigen/Dense>
 #include <Eigen/StdVector>
 
+
 namespace bh {
 
   template <typename Derived>
@@ -163,3 +164,5 @@ public:
 };
 
 }
+
+#include "eigen_options.h"

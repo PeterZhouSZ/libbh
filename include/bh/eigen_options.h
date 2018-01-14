@@ -9,6 +9,7 @@
 #pragma once
 
 #include "eigen.h"
+#include "string_utils.h"
 #include <boost/program_options.hpp>
 #include <boost/throw_exception.hpp>
 #include <boost/algorithm/string.hpp>
@@ -25,7 +26,9 @@ void validate(boost::any& v,
   // Make sure no previous assignment to 'v' was made.
   validators::check_first_occurrence(v);
 
-  const std::string& s = validators::get_single_string(values);
+  std::string s = validators::get_single_string(values);
+  bh::trimLeft(s, [](char c) { return c == '['; });
+  bh::trimRight(s, [](char c) { return c == ']'; });
 
   std::vector<std::string> split_vec;
   boost::split(split_vec, s, boost::is_any_of(" ,"), boost::token_compress_on);
@@ -42,3 +45,4 @@ void validate(boost::any& v,
 }
 
 }
+
