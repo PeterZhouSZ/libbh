@@ -13,6 +13,13 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
+#include <iostream>
+
+#if !BH_NO_STACKTRACE
+#include <signal.h>
+#include <boost/stacktrace.hpp>
+#include <boost/exception/all.hpp>
+#endif
 
 #ifndef _MSC_VER
 #define NOEXCEPT noexcept
@@ -89,9 +96,53 @@ public:
       return what_.c_str();
   }
 
+  template <typename Stream>
+  Stream& printStacktrace() const NOEXCEPT {
+    printStacktrace(std::cerr);
+  }
+
+#if BH_NO_STACKTRACE
+  template <typename Stream>
+  Stream& printStacktrace(Stream& out) const NOEXCEPT {
+    out << "WARNING: Libbh was compiled without stack trace support." << std::endl;
+    return out;
+  }
+
+  bool hasStacktrace() const NOEXCEPT {
+    return false;
+  }
+#else
+  template <typename Stream>
+  Stream& printStacktrace(Stream& out) const NOEXCEPT {
+    out << stacktrace_ << std::endl;
+    return out;
+  }
+
+  bool hasStacktrace() const NOEXCEPT {
+    return true;
+  }
+
+  boost::stacktrace::stacktrace getStacktrace() const NOEXCEPT {
+    return stacktrace_;
+  }
+#endif
+
 private:
     std::string what_;
+#if !BH_NO_STACKTRACE
+    boost::stacktrace::stacktrace stacktrace_;
+#endif
 };
+
+template <typename _CharT>
+std::basic_ostream<_CharT>& operator<<(std::basic_ostream<_CharT>& out, const Exception& exc) {
+  out << "Exception occured: " << exc.what() << std::endl;
+  if (exc.hasStacktrace()) {
+    out << "Stacktrace:" << std::endl;
+    exc.printStacktrace(out);
+  }
+  return out;
+}
 
 class Error : public Exception {
 public:
@@ -101,6 +152,14 @@ public:
   explicit Error(const char* what)
     : Exception(what) {}
 };
+
+template <typename Stream>
+Stream& printStacktrace(Stream& out);
+void printStacktrace();
+
+void registerExitStacktraceFunction();
+void registerAbortStacktraceFunction();
+void registerSegfaultStacktraceFunction();
 
 void debugBreakFunction();
 
@@ -117,11 +176,66 @@ void assertMessage(const std::string& description);
 #include <csignal>
 #include <iostream>
 
+namespace {
+
+#if !BH_NO_STACKTRACE
+inline void signal_handler_stacktrace(int signum) {
+  ::signal(signum, SIG_DFL);
+  bh::printStacktrace();
+  ::raise(signum);
+}
+#endif
+
+}
+
 namespace bh {
 
 // -------------------------
 // Implementation
 // -------------------------
+
+inline void printStacktrace() {
+  printStacktrace(std::cerr);
+}
+
+inline void registerExitStacktraceFunction() {
+  registerAbortStacktraceFunction();
+  registerSegfaultStacktraceFunction();
+}
+
+#if BH_NO_STACKTRACE
+template <typename Stream>
+Stream& printStacktrace(Stream& out) {
+  std::cout << "WARNING: Cannot register exit stacktrace handler. "
+            << "Libbh was compiled without stack trace support." << std::endl;
+    return out;
+}
+
+inline void registerAbortStacktraceFunction() {
+  std::cout << "WARNING: Cannot register SIGABRT stacktrace handler. "
+            << "Libbh was compiled without stack trace support." << std::endl;
+}
+
+inline void registerSegfaultStacktraceFunction() {
+  std::cout << "WARNING: Cannot register SIGSEGV stacktrace handler. "
+            << "Libbh was compiled without stack trace support." << std::endl;
+}
+#else
+template <typename Stream>
+Stream& printStacktrace(Stream& out) {
+  out << boost::stacktrace::stacktrace() << std::endl;
+  return out;
+}
+
+inline void registerAbortStacktraceFunction() {
+  ::signal(SIGABRT, &signal_handler_stacktrace);
+}
+
+inline void registerSegfaultStacktraceFunction() {
+  ::signal(SIGSEGV, &signal_handler_stacktrace);
+}
+#endif
+
 
 #if __GNUC__ && !__CUDACC__
 #pragma GCC push_options
